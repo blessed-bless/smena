@@ -4,7 +4,7 @@ import {mkdtempSync,readdirSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHmac} from 'node:crypto';
-import {icsToRecords,apiToRecords,wallToInstant,createSync,validateFeedUrl} from '../lib/sync.mjs';
+import {icsToRecords,apiToRecords,wallToInstant,createSync,validateFeedUrl,assertPublicHost,internalAddress} from '../lib/sync.mjs';
 import {Store} from '../lib/store.mjs';
 import {validateBackup,initialState,validateRecord} from '../lib/core.mjs';
 import {freeWindows} from '../lib/bot.mjs';
@@ -89,7 +89,7 @@ test('Sync loop: notifications only after first seed, errors are stored',async()
   const store=new Store(':memory:',1),sent=[];let body=feed,statusCode=200;
   const today=new Date().toISOString().slice(0,10).replaceAll('-','');
   const fetchImpl=async()=>new Response(body,{status:statusCode});
-  const sync=createSync({config:{},store,notify:async t=>{sent.push(t)},fetchImpl});
+  const sync=createSync({config:{},store,notify:async t=>{sent.push(t)},fetchImpl,lookup:async()=>[{address:'203.0.113.10'}]});
   assert.equal(sync.configure('http://insecure.example/cal.ics'),null);
   assert.ok(sync.configure('webcal://calendar.google.com/calendar/ical/x/private-y/basic.ics'));
   body=ics([['UID:t1','DTSTART:'+today+'T235900Z','DURATION:PT30M','SUMMARY:Первый']]);
@@ -124,7 +124,7 @@ test('Daily snapshot is created once per day and old copies are rotated',()=>{
 
 test('HTTP: sync settings are owner-only and validated',async()=>{
   const botToken='123:t',store=new Store(':memory:',42);
-  const sync=createSync({config:{},store,fetchImpl:async()=>new Response(feed)});
+  const sync=createSync({config:{},store,fetchImpl:async()=>new Response(feed),lookup:async()=>[{address:'203.0.113.10'}]});
   const signed=id=>{const p=new URLSearchParams({auth_date:String(Math.floor(Date.now()/1000)),user:JSON.stringify({id})});const key=createHmac('sha256','WebAppData').update(botToken).digest();p.set('hash',createHmac('sha256',key).update([...p].sort(([a],[b])=>a<b?-1:1).map(([k,v])=>k+'='+v).join('\n')).digest('hex'));return p.toString()};
   const server=createApp({botToken,ownerId:42,port:0},store,sync);
   await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port,base='http://127.0.0.1:'+port;
@@ -147,4 +147,22 @@ test('HTTP: sync settings are owner-only and validated',async()=>{
     assert.equal((await call(friend,'sync-now',{})).status,200);
     assert.equal((await (await fetch(base+'/health')).json()).yclientsConnected,true);
   }finally{await new Promise(r=>app.close(r))}
+});
+
+test('Calendar fetch refuses internal addresses and re-checks redirects',async()=>{
+  for(const a of ['127.0.0.1','10.1.2.3','172.20.0.1','192.168.1.1','169.254.169.254','0.0.0.0','::1','fd00::1','fe80::1','::ffff:127.0.0.1'])assert.equal(internalAddress(a),true,a);
+  for(const a of ['8.8.8.8','203.0.113.10','2a00:1450:4010::64'])assert.equal(internalAddress(a),false,a);
+  await assert.rejects(assertPublicHost('https://127.0.0.1/a.ics'),/внутреннюю сеть/);
+  await assert.rejects(assertPublicHost('https://[::1]/a.ics'),/внутреннюю сеть/);
+  await assert.rejects(assertPublicHost('https://cal.example/a.ics',async()=>[{address:'93.184.216.34'},{address:'10.0.0.5'}]),/внутреннюю сеть/);
+  await assertPublicHost('https://cal.example/a.ics',async()=>[{address:'93.184.216.34'}]);
+  const dir=mkdtempSync(join(tmpdir(),'smena-ssrf-')),store=new Store(join(dir,'db.sqlite'),initialState());
+  try{
+    const asked=[],lookup=async h=>[{address:h==='inner.example'?'192.168.0.10':'203.0.113.10'}];
+    const fetchImpl=async u=>{asked.push(u);return new Response('',{status:302,headers:{location:'https://inner.example/x.ics'}})};
+    const sync=createSync({config:{},store,fetchImpl,lookup});
+    sync.configure('https://cal.example/feed.ics');
+    assert.match((await sync.run()).error,/внутреннюю сеть/);
+    assert.deepEqual(asked,['https://cal.example/feed.ics']);
+  }finally{store.close?.();rmSync(dir,{recursive:true,force:true})}
 });
