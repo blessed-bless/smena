@@ -1,0 +1,16 @@
+services:
+  smena:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8732"
+      DATA_DIR: "/app/data"
+      TRUST_PROXY: "1"
+    ports:
+      - "127.0.0.1:8732:8732"
+    volumes:
+      - smena-data:/app/data
+volumes:
+  smena-data:
