@@ -1,0 +1,24 @@
+# Вариант без Docker: Node.js 24 + systemd.
+#   useradd --system --home /opt/smena smena && mkdir -p /var/lib/smena && chown smena /var/lib/smena
+#   cp deploy/smena.service /etc/systemd/system/ && systemctl enable --now smena
+[Unit]
+Description=Smena — личный кабинет барбера
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=smena
+WorkingDirectory=/opt/smena
+EnvironmentFile=/opt/smena/.env
+Environment=HOST=127.0.0.1 DATA_DIR=/var/lib/smena TRUST_PROXY=1
+ExecStart=/usr/bin/node server.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/smena
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

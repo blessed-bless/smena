@@ -1,0 +1,12 @@
+.env*
+!.env.example
+config.json
+data/
+**/*.sqlite*
+*.log
+node_modules/
+.git/
+*-preview.png
+bot-avatar.png
+*.zip
+*.dpapi
