@@ -45,6 +45,22 @@ test('HTTP: auth, origin, persistent revision, cancellation and private files',a
   }finally{await new Promise(r=>production.close(r));store.close()}
 });
 
+test('HTTP: static files revalidate with ETag, HEAD works, malformed settings are a 400',async()=>{
+  const store=new Store(':memory:',42),server=createApp({botToken,ownerId:42,publicUrl:'http://smena.test'},store);
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+  try{
+    const first=await fetch(base+'/app.js'),etag=first.headers.get('etag');
+    assert.equal(first.status,200);assert.match(etag,/^"[\w-]+"$/);assert.equal(first.headers.get('cache-control'),'no-cache');
+    const again=await fetch(base+'/app.js',{headers:{'if-none-match':etag}});assert.equal(again.status,304);assert.equal((await again.text()).length,0);
+    const head=await fetch(base+'/?date=2026-11-12',{method:'HEAD'});assert.equal(head.status,200);assert.match(head.headers.get('content-type'),/text\/html/);
+    assert.equal((await fetch(base+'/api/state')).headers.get('cache-control'),'no-store'); // данные по-прежнему не кэшируются
+    const health=await (await fetch(base+'/health')).json();assert.equal(health.status,'ok');assert.match(health.version,/^\d+\.\d+\.\d+$/);
+    const session=store.createSession(42),settings={...initialState().settings,services:[null]};
+    const bad=await fetch(base+'/api/settings',{method:'POST',headers:{authorization:'Bearer '+session,origin:'http://smena.test','content-type':'application/json'},body:JSON.stringify({revision:0,settings})});
+    assert.equal(bad.status,400);
+  }finally{await new Promise(r=>server.close(r));store.close()}
+});
+
 test('Revocation during body upload prevents a write with an already revoked session',async()=>{
   const store=new Store(':memory:',42);
   store.redeemInvite(store.createInvite(),7);
