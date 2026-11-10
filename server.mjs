@@ -2,12 +2,14 @@ import http from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
 import {Store} from './lib/store.mjs';
-import {AppError,verifyTelegram,validateRecord,validateSettings,validateBackup,validateDayOverride,localNow} from './lib/core.mjs';
+import {AppError,verifyTelegram,upsertRecord,validateSettings,validateBackup,validateDayOverride,localNow} from './lib/core.mjs';
 import {startBot} from './lib/bot.mjs';
 import {createSync} from './lib/sync.mjs';
 
 const ROOT=dirname(fileURLToPath(import.meta.url));
+export const VERSION='0.5.0';
 const FILES={'/':'index.html','/demo':'index.html','/shared.mjs':'shared.mjs','/app.js':'app.js','/app.css':'app.css','/icon.svg':'icon.svg'};
 export function createApp(config,store,sync=null){
   const origin=config.publicUrl?new URL(config.publicUrl).origin:null,rate=new Map();
@@ -17,9 +19,17 @@ export function createApp(config,store,sync=null){
     const json=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data))};
     try{
       const url=new URL(req.url,'http://localhost'),path=url.pathname;
-      if(req.method==='GET'&&path==='/health'){const s=sync?.status();return json(200,{status:'ok',yclientsConnected:!!(s?.mode&&s.at&&!s.error)})}
+      const head=req.method==='HEAD',get=req.method==='GET'||head;
+      if(get&&path==='/health'){const s=sync?.status();return json(200,{status:'ok',version:VERSION,yclientsConnected:!!(s?.mode&&s.at&&!s.error)})}
       if(req.method==='GET'&&path==='/api/public')return json(200,{botUsername:config.botUsername||'',timeZone:store.read().settings.timeZone});
-      if(req.method==='GET'&&FILES[path]){const file=FILES[path];const mime=file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/javascript';const content=await readFile(resolve(ROOT,file));res.writeHead(200,{'Content-Type':mime+'; charset=utf-8'});res.end(content);return}
+      if(get&&FILES[path]){
+        // Статика отдаётся с ETag: при повторном открытии Mini App браузер получает 304 вместо 60+ КБ.
+        const file=FILES[path],mime=file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/javascript';
+        const content=await readFile(resolve(ROOT,file)),etag='"'+createHash('sha1').update(content).digest('base64url')+'"';
+        res.setHeader('Cache-Control','no-cache');res.setHeader('ETag',etag);
+        if(req.headers['if-none-match']===etag){res.writeHead(304);res.end();return}
+        res.writeHead(200,{'Content-Type':mime+'; charset=utf-8','Content-Length':content.length});res.end(head?undefined:content);return;
+      }
       if(!path.startsWith('/api/'))return json(404,{error:'NOT_FOUND',message:'Страница не найдена.'});
       if(!['GET','POST'].includes(req.method))return json(405,{error:'METHOD',message:'Недоступный метод.'});
       if(req.method==='POST'){
@@ -48,7 +58,7 @@ export function createApp(config,store,sync=null){
       if(path==='/api/audit'&&req.method==='GET')return json(200,{events:store.audit()});
       if(path==='/api/export'&&req.method==='GET'){res.setHeader('Content-Disposition','attachment; filename="smena-backup.json"');return json(200,{format:'smena-v2',exportedAt:new Date().toISOString(),...store.read()})}
       if(path==='/api/record'&&req.method==='POST'){
-        const next=store.mutate(body.revision,state=>{const old=body.record?.id&&state.records.find(r=>r.id===body.record.id);if(body.record?.id&&!old)throw new AppError('NOT_FOUND','Запись не найдена.',404);if(old?.source==='yclients')throw new AppError('READONLY','Запись из YCLIENTS меняется только в YCLIENTS.',403);if(state.records.length>=5000&&!body.record?.id)throw new AppError('LIMIT','Достигнут лимит записей. Сохраните резервную копию.');const record=validateRecord(body.record,state);state.records=state.records.filter(r=>r.id!==record.id).concat(record);return state},'Сохранение записи');return json(200,next);
+        const next=store.mutate(body.revision,state=>{upsertRecord(state,body.record);return state},'Сохранение записи');return json(200,next);
       }
       if(path==='/api/cancel'&&req.method==='POST'){const next=store.mutate(body.revision,state=>{const r=state.records.find(r=>r.id===body.id);if(!r)throw new AppError('NOT_FOUND','Запись не найдена.',404);if(r.source==='yclients')throw new AppError('READONLY','Запись из YCLIENTS меняется только в YCLIENTS.',403);r.status='cancelled';r.updatedAt=new Date().toISOString();return state},'Отмена визита');return json(200,next)}
       if(path==='/api/settings'&&req.method==='POST'){const next=store.mutate(body.revision,state=>({...state,settings:validateSettings(body.settings)}),'Изменение настроек');return json(200,next)}
@@ -98,7 +108,9 @@ async function main(){
   bot=config.publicUrl?startBot(config,store):null;
   const syncLoop=sync.start();
   const snap=()=>{try{store.snapshot(resolve(config.dataDir,'snapshots'))}catch(e){console.error('Snapshot failed:',e.message)}};snap();const snapTimer=setInterval(snap,6*3600*1000);snapTimer.unref();
-  process.once('SIGINT',()=>{bot?.stop();syncLoop.stop();server.close(()=>{store.close();process.exit(0)})});
-  process.once('SIGTERM',()=>{bot?.stop();syncLoop.stop();server.close(()=>{store.close();process.exit(0)})});
+  // Сбой в фоновой задаче не должен ронять сервер молча: пишем причину (без данных запроса) и работаем дальше.
+  process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e?.message||e));
+  const shutdown=()=>{bot?.stop();syncLoop.stop();clearInterval(snapTimer);server.close(()=>{store.close();process.exit(0)});server.closeIdleConnections?.()};
+  process.once('SIGINT',shutdown);process.once('SIGTERM',shutdown);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(e=>{console.error(e.message);process.exitCode=1});
