@@ -147,6 +147,9 @@ assert.equal(v.records.length,0);assert.equal(v.account.company,'Салон на
     assert.equal((await (await get('state',anna.session)).json()).records.some(r=>r.name==='Только Вера'),false);
     // Кабинет владельца бота нетронут.
     assert.equal(store.read().records.length,0);assert.equal(store.account(),null);
+    // Помощник не подключает свой YCLIENTS к чужому кабинету, даже пустому.
+    store.db.prepare('INSERT INTO members VALUES(?,?)').run(42,900);
+    assert.equal((await post('yc/login',{initData:signed(900),login:'anna@x.ru',password:'pass1'})).status,403);assert.equal(store.account(),null);
     // Отключение YCLIENTS убирает его записи, удаление кабинета — всё остальное.
     const off=await (await post('yc/disconnect',{},anna.session)).json();assert.equal(off.records.length,0);assert.equal(off.sync.mode,null);
     assert.equal((await post('cabinet-delete',{confirm:'нет'},vera.session)).status,400);

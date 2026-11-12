@@ -56,6 +56,9 @@ test('Booking: cancel by key or by Telegram owner only, online fields survive ed
   assert.deepEqual([moved.origin,moved.clientTg,moved.cancelKey],['online',777,keyHash(key)]);
   const copy=validateBackup({format:'smena-v2',...store.read()});
   assert.equal(copy.records[0].clientTg,777);
+  // Копия из файла не приносит Telegram ID, которых нет в кабинете: бот не будет писать посторонним.
+  const forged=validateBackup({format:'smena-v2',...store.read(),records:store.read().records.map(r=>({...r,clientTg:555}))},new Set([777]));
+  assert.equal(forged.records[0].clientTg,undefined);assert.equal(validateBackup({format:'smena-v2',...store.read()},new Set([777])).records[0].clientTg,777);
   const h=keyHash(key);assert.equal(cancelBooking(db,r=>r.cancelKey===h).status,'cancelled');
   assert.throws(()=>cancelBooking(db,r=>r.cancelKey===h),/нельзя/);
 });

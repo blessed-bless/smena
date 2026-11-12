@@ -35,7 +35,7 @@ export function createApp(config,store,sync=null,yc=createYclients({partnerToken
   // Подключает аккаунт YCLIENTS: к кабинету, куда у человека уже есть доступ, или к новому кабинету.
   async function connect(res,t,company,staff){
     let cabinet=store.cabinetOf(t.tgId);
-    if(cabinet!==null&&cabinet!==t.tgId&&store.scope(cabinet).account())throw new AppError('FORBIDDEN','К этому кабинету YCLIENTS подключает его хозяин.',403);
+    if(cabinet!==null&&cabinet!==t.tgId)throw new AppError('FORBIDDEN','К этому кабинету YCLIENTS подключает его хозяин.',403);
     const created=cabinet===null;
     // Новый мастер сразу получает утренний план в Telegram: ради этого бот и нужен.
     if(created){const state=initialState(),zone=validZone(company.timeZone);if(zone)state.settings.timeZone=zone;state.settings.morning=true;cabinet=t.tgId;store.createCabinet(cabinet,state)}
@@ -228,7 +228,7 @@ export function createApp(config,store,sync=null,yc=createYclients({partnerToken
         const data=validateBackup(body.backup),dates=data.records.map(r=>r.date).sort();
         return json(200,{records:data.records.length,clients:new Set(data.records.filter(r=>r.type!=='block').map(r=>r.name)).size,firstDate:dates[0]||null,lastDate:dates.at(-1)||null});
       }
-      if(path==='/api/import'&&req.method==='POST')return json(200,db.restore(body.revision,validateBackup(body.backup)));
+      if(path==='/api/import'&&req.method==='POST')return json(200,db.restore(body.revision,validateBackup(body.backup,(s=>new Set([...s.records,...s.waitlist].map(x=>x.clientTg).filter(Boolean)))(db.read()))));
       if(path==='/api/restore-copy'&&req.method==='POST'){
         if(!Number.isSafeInteger(body.id)||body.id<=0)throw new AppError('INVALID','Выберите сохранённую копию.');
         const data=validateBackup({...db.backup(body.id),format:'smena-v2'});
