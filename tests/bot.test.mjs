@@ -43,7 +43,7 @@ test('Bot: stranger refused, invite redeemed once, commands answer, menu configu
     ]);
     assert.equal(sent[3][0],7);assert.match(sent[3][1],/^<b>Свободные окна: .+<\/b> — сегодня$/);
     assert.equal(sent[4][0],42);assert.match(sent[4][1],/^<b>Неделя: /);
-    assert.deepEqual(sent[5],[7,'Приглашения выдаёт владелец бота.']);
+    assert.deepEqual(sent[5],[7,'Приглашения выдаёт хозяин кабинета.']);
     assert.equal(sent[6][0],42);assert.match(sent[6][1],/ — завтра$/);
     assert.equal(store.friend(),7);
     assert.equal(cfg.botUsername,'auto_bot'); // имя бота определено через getMe
@@ -137,4 +137,24 @@ test('Bot API wrapper waits out a 429 and never puts the token into an error',as
     assert.equal(await telegram({botToken:'1:secret'},'sendMessage',{}),'sent');assert.equal(n,2);
     await assert.rejects(telegram({botToken:'1:secret'},'sendMessage',{}),e=>e.code===403&&!e.message.includes('secret')&&/blocked/.test(e.description));
   }finally{globalThis.fetch=original}
+});
+
+test('Bot: each barber sees their own cabinet; reminders go to each cabinet; strangers are sent to YCLIENTS sign-in',async()=>{
+  const store=announced(new Store(':memory:',42)),vera=store.createCabinet(500);
+  const today=localNow(store.read().settings.timeZone).date;
+  vera.mutate(0,s=>{s.records.push({id:'v1',name:'Клиент Веры',service:'Мужская стрижка',date:today,time:'23:30',duration:30,status:'confirmed',type:'visit',note:'',phone:'',price:0});s.settings.morning=false;return s});
+  store.mutate(0,s=>{s.settings.morning=false;s.settings.reminders=false;return s});
+  vera.mutate(1,s=>{s.settings.reminderMinutes=24*60;return s}); // напоминание сработает сразу
+  const tg=fakeTelegram([[msg(1,500,'/today'),msg(2,42,'/today'),msg(3,900,'/today'),msg(4,500,'Клиент Веры')]]);
+  const bot=startBot({...config(),yclients:{partnerToken:'p'}},store);
+  try{
+    await until(()=>tg.calls.filter(c=>c.method==='sendMessage').length>=5);
+    const sent=tg.calls.filter(c=>c.method==='sendMessage').map(c=>c.body);
+    const to=id=>sent.filter(b=>b.chat_id===id).map(b=>b.text).join('\n---\n');
+    assert.match(to(500),/Клиент Веры/);assert.doesNotMatch(to(42),/Клиент Веры/);
+    const stranger=sent.find(b=>b.chat_id===900);assert.match(stranger.text,/аккаунтом YCLIENTS/);
+    assert.equal(stranger.reply_markup.inline_keyboard.flat().length,1);assert.equal(stranger.reply_markup.inline_keyboard[0][0].web_app.url,'https://smena.test'); // кнопка открытия приложения
+    assert.ok(sent.some(b=>b.chat_id===500&&/Клиент Веры/.test(b.text)&&b.text.includes('23:30')&&/мин|ч/.test(b.text))); // напоминание пришло Вере
+    await bot.notify('Новая запись',vera);assert.equal(tg.calls.at(-1).body.chat_id,500);
+  }finally{bot.stop();tg.restore()}
 });

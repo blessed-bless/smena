@@ -33,6 +33,9 @@ for ($attempt=0; $attempt -lt 60; $attempt++) {
 if (-not $publicUrl) { Stop-Process -Id $tunnel.Id; throw 'No HTTPS tunnel URL received.' }
 $config = Get-Content -Raw -LiteralPath $configFile | ConvertFrom-Json
 $config | Add-Member -NotePropertyName publicUrl -NotePropertyValue $publicUrl -Force
+# Сервер слушает только 127.0.0.1, и подключается к нему только туннель. Адрес клиента берём из X-Forwarded-For,
+# иначе все клиенты страницы записи делят один лимит запросов адреса 127.0.0.1.
+$config | Add-Member -NotePropertyName trustProxy -NotePropertyValue $true -Force
 $config | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 -LiteralPath $configFile
 $node = (Get-Command node).Source
 $serverLog = Join-Path $runtimeDir ('server-' + $tag + '.log')

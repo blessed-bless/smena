@@ -470,3 +470,118 @@ html[data-dir="prev"]::view-transition-new(page){animation-name:page-prev}
 @keyframes page-in{from{opacity:0;transform:translateY(6px)}}
 @keyframes page-next{from{opacity:0;transform:translateX(24px)}}
 @keyframes page-prev{from{opacity:0;transform:translateX(-24px)}}
+
+/* Вход через YCLIENTS */
+.signin{max-width:420px;margin:28px auto 40px;padding:0 4px}
+.signin-icon{width:56px;height:56px;border-radius:16px;box-shadow:var(--lift);margin-bottom:22px}
+.signin h1{font-size:28px;line-height:1.15;letter-spacing:-.02em}
+.signin>p{font-size:15px;color:var(--muted);line-height:1.6;margin:10px 0 22px}
+.signin>p b{color:var(--ink);font-weight:650}
+.signin form{display:flex;flex-direction:column;gap:14px}
+.signin form .primary{width:100%;margin-top:4px}
+.signin form .error{margin:0}
+.signin>.text-button{display:block;margin:10px auto 0}
+.password{position:relative;display:block}
+.password input{padding-right:52px}
+.reveal{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:11px;background:transparent;color:var(--muted);display:grid;place-items:center}
+.reveal svg{width:20px;height:20px}
+.signin-note{display:flex;gap:10px;align-items:flex-start;margin-top:26px;padding:14px;border-radius:16px;background:var(--soft);font-size:13px;line-height:1.55;color:var(--muted)}
+.signin-note svg{flex:none;width:18px;height:18px;margin-top:1px;color:var(--accent)}
+.picks{display:flex;flex-direction:column;border-radius:18px;background:var(--paper);box-shadow:var(--card);border:1px solid var(--edge);overflow:hidden}
+.pick{display:flex;gap:14px;align-items:center;padding:14px 16px;min-height:56px;cursor:pointer}
+.pick+.pick{box-shadow:inset 0 1px 0 var(--line)}
+.pick input{flex:none;appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:50%;border:2px solid var(--off);background:var(--paper);transition:border-color .15s,border-width .15s}
+.pick input:checked{border:7px solid var(--accent)}
+.pick input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pick span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pick b{font-weight:600;font-size:16px}
+.pick small{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.pick:has(input:checked){background:var(--tint)}
+.account-card{display:flex;gap:14px;align-items:center;padding:14px 16px;margin:6px 0 12px;border-radius:18px;background:var(--paper);border:1px solid var(--edge);box-shadow:var(--card)}
+.account-card .avatar{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--tint);color:var(--accent);font-weight:700;font-size:18px}
+.account-card div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.account-card small{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+#delete-form .field{margin-bottom:10px}
+
+/* Мои деньги */
+.panel.money{margin-bottom:14px}
+.money-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.money-head h2 small{font-size:14px;font-weight:600;color:var(--muted);margin-left:4px}
+.money-head .text-button{min-height:32px;padding:0}
+.money-value{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.5px;margin-top:10px}
+.panel.money .sub{margin-top:4px}
+.goal-bar{position:relative;display:flex;height:12px;margin:16px 0 10px;border-radius:99px;background:var(--soft);overflow:hidden}
+.goal-bar .earned{background:var(--accent)}
+.goal-bar .booked{background:repeating-linear-gradient(-45deg,var(--accent) 0 4px,transparent 4px 8px);opacity:.45}
+.goal-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted)}
+.goal-legend span{display:inline-flex;align-items:center;gap:6px}
+.goal-legend b{color:var(--ink);font-weight:650}
+.goal-legend .goal-of{margin-left:auto}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.dot.earned{background:var(--accent)}
+.dot.booked{background:repeating-linear-gradient(-45deg,var(--accent) 0 2px,transparent 2px 4px);opacity:.6;box-shadow:inset 0 0 0 1px var(--accent)}
+.money-hint{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;line-height:1.5;color:var(--ink)}
+
+/* Позвать в свободное окно */
+.invite-gap{margin:0 0 16px}
+.invite-gap h3{font-size:13px;font-weight:650;color:var(--muted);margin-bottom:8px}
+.invite-list{display:flex;gap:8px;overflow-x:auto;margin:0 -4px;padding:2px 4px;scrollbar-width:none}
+.invite-list::-webkit-scrollbar{display:none}
+.invite{flex:none;display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border-radius:99px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-align:left}
+.invite .avatar{width:34px;height:34px;font-size:12px}
+.invite span{display:flex;flex-direction:column;line-height:1.2}
+.invite b{font-size:14px;font-weight:650}
+.invite small{font-size:12px;color:var(--muted)}
+.invite:active{transform:scale(.97)}
+.story-button{width:100%;margin-top:10px}
+.story-preview{display:block;width:100%;max-width:300px;margin:4px auto 14px;border-radius:18px;box-shadow:var(--lift)}
+
+/* Первые шаги */
+.tips{background:var(--paper);border:1px solid var(--edge);border-radius:20px;box-shadow:var(--card);padding:14px 14px 6px;margin-bottom:14px}
+.tips-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.tips-head h2{font-size:17px}
+.tips-count{font-size:14px;color:var(--muted);margin-right:auto}
+.tips-head .icon-button{width:36px;height:36px;min-height:36px}
+.tips-head .icon-button svg{width:18px;height:18px}
+.tip{display:flex;align-items:center;gap:12px;width:100%;padding:10px 2px;border:0;background:transparent;color:var(--ink);text-align:left}
+.tip+.tip{box-shadow:inset 0 1px 0 var(--line)}
+.tip i{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--off)}
+.tip.done i{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.tip.done i svg{width:14px;height:14px;stroke-width:3}
+.tip span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.tip b{font-size:15px;font-weight:650}
+.tip small{font-size:13px;color:var(--muted)}
+.tip.done b{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--off)}
+.tip:not(.done):active{opacity:.6}
+
+/* Онлайн-запись и лист ожидания (0.7) */
+.src.online{color:var(--accent);background:var(--tint)}
+.booking-link{margin:0 0 20px;padding:16px;border-radius:18px;background:var(--tint);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+.booking-link h3{margin-bottom:6px}
+.link-text{font-size:14px;color:var(--ink);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.booking-link .actions{margin-top:12px;flex-wrap:wrap}
+.booking-link .actions>*{flex:1 1 140px}
+.text-button.inline{min-height:0;padding:0;font-size:inherit}
+.inline-hint.warn{color:var(--warn)}
+.online-note{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:var(--tint);color:var(--ink)}
+.wait-row .client-meta{border:0;background:transparent;text-align:left;color:inherit;padding:0}
+.wait-add{width:100%;margin-top:12px}
+.tag.online{color:var(--accent);background:var(--tint)}
+.next-list{display:grid;gap:8px}
+.next-pick{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:60px;padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:var(--paper);text-align:left}
+.next-pick b{display:block;font-weight:650}
+.next-pick small{display:inline-block;margin-top:3px}
+.next-pick .num{font-size:17px;font-weight:650;white-space:nowrap}
+.next-pick:active{background:var(--soft)}
+.net-row{display:flex;align-items:center;gap:14px;width:100%;margin-top:12px;padding:12px 0 0;border:0;border-top:1px solid var(--line);background:none;color:var(--muted);font-size:14px;text-align:left}
+.net-row span{display:flex;flex-direction:column;gap:2px}
+.net-row b{color:var(--ink);font-size:18px;font-weight:700}
+.net-row svg{margin-left:auto;color:var(--faint)}
+.kinds{flex-wrap:wrap;margin:14px 0}
+.chip.kind{display:inline-flex;align-items:center;cursor:pointer}
+.chip.kind input{position:absolute;opacity:0;pointer-events:none}
+.chip.kind:has(input:checked){background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.kind:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.kind-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--muted)}
+.kind-sum b{color:var(--ink)}
+.expense-row{cursor:default}

@@ -58,6 +58,18 @@ export function slotStarts(state,date,duration,from=0,step=30){
   return out;
 }
 
+// Окна для онлайн-записи: дни от сегодня на booking.days вперёд, не раньше чем через booking.notice минут от текущего момента.
+// Возвращает [[дата, [время…]], …] только для дней, где есть хотя бы одно окно.
+export function bookingSlots(state,duration,today,now,booking=state.settings.booking){
+  const earliest=mins(now)+(booking?.notice||0),out=[];
+  for(let i=0;i<(booking?.days||14);i++){
+    const from=earliest-i*1440;if(from>=1440)continue;
+    const d=shiftDate(today,i),slots=slotStarts(state,d,duration,Math.max(0,Math.ceil(from/15)*15));
+    if(slots?.length)out.push([d,slots]);
+  }
+  return out;
+}
+
 // Телефон в международном виде без знаков: 8 999 123-45-67 -> 79991234567. '' — если номер не разобрать.
 export function phoneDigits(phone){
   const d=String(phone||'').replace(/\D/g,'');
@@ -102,6 +114,58 @@ export function clientSummaries(state,today){
 // Давно не был: приходил, новой записи нет, и прошло заметно больше его обычного интервала (минимум 6 недель).
 export const isLost=c=>!c.next&&c.daysSince!==null&&c.daysSince>=Math.max(42,Math.round((c.interval||0)*1.5));
 export const isNew=(c,today)=>c.visits<=1&&daysBetween(c.first,today)<=30;
+
+// Кого позвать в свободное окно: был хотя бы раз, новой записи нет и подходит его обычный срок (по умолчанию 4 недели).
+// Первыми идут те, кто дольше всех «перехаживает» свой интервал.
+export function dueClients(state,today,limit=3){
+  const late=c=>c.daysSince-(c.interval||28);
+  return clientSummaries(state,today).filter(c=>!c.next&&c.visits>0&&c.daysSince!==null&&c.daysSince>=Math.max(14,(c.interval||28)-5))
+    .sort((a,b)=>late(b)-late(a)||a.name.localeCompare(b.name,'ru')).slice(0,limit);
+}
+
+// Следующий визит «не вставая с кресла»: через обычный интервал клиента, 4 и 6 недель.
+// Для каждого срока — то же время в тот же день недели, иначе ближайшее окно в пределах ±3 дней.
+export function nextVisitOptions(state,record,today,limit=3){
+  const summary=clientSummaries(state,today).find(c=>c.name===record.name),usual=summary?.interval?Math.round(summary.interval/7):0;
+  const weeks=[...new Set([...(usual>=1&&usual<=10?[usual]:[]),4,6])].slice(0,limit),out=[];
+  for(const w of weeks){
+    const target=shiftDate(record.date,w*7);let best=null;
+    for(const delta of [0,1,-1,2,-2,3,-3]){
+      const d=shiftDate(target,delta);if(d<=today)continue;
+      const slots=slotStarts(state,d,record.duration)||[];if(!slots.length)continue;
+      const time=slots.reduce((a,b)=>Math.abs(mins(b)-mins(record.time))<Math.abs(mins(a)-mins(record.time))?b:a);
+      best={weeks:w,date:d,time,usual:w===usual,exact:delta===0&&time===record.time};break;
+    }
+    if(best&&!out.some(o=>o.date===best.date&&o.time===best.time))out.push(best);
+  }
+  return out;
+}
+
+// Деньги мастера за календарный месяц: выручка завершённых визитов и ещё не оказанных записей, умноженная на долю мастера.
+export function monthMoney(state,today){
+  const share=state.settings.share??100,goal=state.settings.goal||0,from=today.slice(0,8)+'01',end=shiftDate(shiftDate(from,32).slice(0,8)+'01',-1);
+  const rows=state.records.filter(r=>isVisit(r)&&r.date>=from&&r.date<=end),part=n=>Math.round(n*share/100);
+  const done=rows.filter(r=>r.status==='done'),ahead=rows.filter(r=>isActive(r)&&r.status!=='done'&&r.date>=today);
+  const earned=part(done.reduce((n,r)=>n+(r.price||0),0)),booked=part(ahead.reduce((n,r)=>n+(r.price||0),0));
+  const paid=done.filter(r=>r.price>0).length,avg=paid?Math.round(earned/paid):0,left=Math.max(0,goal-earned-booked);
+  // Расходы месяца (аренда, материалы) вычитаются из заработанного: «чистыми» — то, что остаётся мастеру.
+  const spent=(state.expenses||[]).filter(x=>x.date>=from&&x.date<=end).reduce((n,x)=>n+x.amount,0);
+  return {from,end,share,goal,earned,booked,forecast:earned+booked,spent,net:earned-spent,left,avg,visitsToGoal:avg&&left?Math.ceil(left/avg):0,
+    daysLeft:daysBetween(today,end)+1,priced:rows.some(r=>r.price>0)||state.settings.services.some(s=>s.price>0)};
+}
+
+// Таблицы для Excel: точка с запятой, BOM для кириллицы, формулы в ячейках обезврежены апострофом.
+export const STATUS_RU={confirmed:'Подтверждена',waiting:'Ожидает ответа',arrived:'Пришёл',done:'Завершён',cancelled:'Отменена',noshow:'Не пришёл'};
+const cell=x=>{const s=String(x??'');return /^[=+\-@\t\r]/.test(s)?`"'${s.replaceAll('"','""')}"`:`"${s.replaceAll('"','""')}"`};
+const table=rows=>'﻿'+rows.map(r=>r.map(cell).join(';')).join('\r\n');
+export function recordsCsv(state){
+  return table([['Дата','Время','Длительность, мин','Клиент','Услуга','Статус','Цена, ₽','Телефон','Источник','Заметка'],
+    ...state.records.filter(isVisit).sort(byMoment).map(r=>[r.date,r.time,r.duration,r.name,r.service,STATUS_RU[r.status]||r.status,r.price||0,r.phone,r.source==='yclients'?'YCLIENTS':r.origin==='online'?'Онлайн-запись':'Личный план',r.note])]);
+}
+export function clientsCsv(state,today){
+  return table([['Клиент','Телефон','Визитов','Первый визит','Последний визит','Следующая запись','Ходит раз в, дней','Оставил, ₽','Не пришёл, раз','Заметка'],
+    ...clientSummaries(state,today).sort((a,b)=>a.name.localeCompare(b.name,'ru')).map(c=>[c.name,c.phone,c.visits,c.first,c.last?.date||'',c.next?c.next.date+' '+c.next.time:'',c.interval||'',c.spent,c.noshow,state.clientNotes?.[c.name]||''])]);
+}
 
 // Итоги периода [from, to] включительно: визиты, выручка, загрузка, услуги и разбивка по дням.
 export function periodStats(state,from,to){

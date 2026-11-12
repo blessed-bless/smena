@@ -157,7 +157,7 @@ test('Calendar fetch refuses internal addresses and re-checks redirects',async()
   await assert.rejects(assertPublicHost('https://[::1]/a.ics'),/внутреннюю сеть/);
   await assert.rejects(assertPublicHost('https://cal.example/a.ics',async()=>[{address:'93.184.216.34'},{address:'10.0.0.5'}]),/внутреннюю сеть/);
   await assertPublicHost('https://cal.example/a.ics',async()=>[{address:'93.184.216.34'}]);
-  const dir=mkdtempSync(join(tmpdir(),'smena-ssrf-')),store=new Store(join(dir,'db.sqlite'),initialState());
+  const dir=mkdtempSync(join(tmpdir(),'smena-ssrf-')),store=new Store(join(dir,'db.sqlite'),42);
   try{
     const asked=[],lookup=async h=>[{address:h==='inner.example'?'192.168.0.10':'93.184.216.34'}];
     const fetchImpl=async u=>{asked.push(u);return new Response('',{status:302,headers:{location:'https://inner.example/x.ics'}})};
