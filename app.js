@@ -111,7 +111,7 @@ function syncSettings(){
 }
 function nav(){const items=[['today','Сегодня'],['calendar','Календарь'],['clients','Клиенты'],['stats','Обзор']];$('#navigation').hidden=false;$('#navigation').innerHTML=`<div class="nav-inner">${items.map(([id,name])=>`<button class="nav-item ${tab===id?'active':''}" data-action="tab" data-value="${id}" ${tab===id?'aria-current="page"':''}>${icon(id)}<span>${name}</span></button>`).join('')}</div>`;setBack()}
 function recordsOn(d=date){return state.records.filter(r=>r.date===d).sort((a,b)=>a.time.localeCompare(b.time))}
-function gaps(d=date){const s=workday(state,d);if(s.closed)return [];let cursor=mins(s.start),out=[];for(const r of recordsOn(d).filter(active)){const start=Math.max(mins(s.start),mins(r.time));if(start>cursor)out.push([cursor,Math.min(start,mins(s.end))]);cursor=Math.max(cursor,mins(r.time)+r.duration)}if(cursor<mins(s.end))out.push([cursor,mins(s.end)]);return out.filter(g=>g[1]>g[0])}
+function gaps(d=date){const s=workday(state,d);if(s.closed)return [];let scanAt=mins(s.start),out=[];for(const r of recordsOn(d).filter(active)){const start=Math.max(mins(s.start),mins(r.time));if(start>scanAt)out.push([scanAt,Math.min(start,mins(s.end))]);scanAt=Math.max(scanAt,mins(r.time)+r.duration)}if(scanAt<mins(s.end))out.push([scanAt,mins(s.end)]);return out.filter(g=>g[1]>g[0])}
 function clockNow(){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:state.settings.timeZone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).map(x=>[x.type,x.value]));return Number(p.hour)*60+Number(p.minute)}
 const PX=1.25; // пикселей на минуту: час = 75 px, рабочий день — около полутора экранов телефона
 function appt(r,top,lane,live){

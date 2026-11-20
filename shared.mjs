@@ -35,14 +35,14 @@ export function freeGaps(state,date,from=0,minGap=15){
   const hours=workday(state,date);
   if(hours.closed)return null;
   const end=mins(hours.end),out=[];
-  let cursor=Math.max(mins(hours.start),from);
+  let scanAt=Math.max(mins(hours.start),from);
   const busy=state.records.filter(r=>r.date===date&&isActive(r)).sort((a,b)=>a.time.localeCompare(b.time));
   for(const r of busy){
     const start=Math.min(mins(r.time),end);
-    if(start-cursor>=minGap)out.push([cursor,start]);
-    cursor=Math.max(cursor,mins(r.time)+r.duration);
+    if(start-scanAt>=minGap)out.push([scanAt,start]);
+    scanAt=Math.max(scanAt,mins(r.time)+r.duration);
   }
-  if(end-cursor>=minGap)out.push([cursor,end]);
+  if(end-scanAt>=minGap)out.push([scanAt,end]);
   return out;
 }
 
